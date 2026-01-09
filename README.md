@@ -33,7 +33,7 @@ El sistema cumple con la totalidad de los requerimientos solicitados, incluyendo
 
 ### Pasos para ejecutar
 1.  Clonar el repositorio o descargar el codigo fuente.
-2.  Abrir el archivo de solucion `PdcEvaluacion.sln` en Visual Studio.
+2.  Abrir el archivo de solucion `PdcEvaluacion.slnx` en Visual Studio.
 3.  Configurar la solucion para inicio multiple:
     * Clic derecho en la Solucion -> Propiedades.
     * Seleccionar "Proyectos de inicio multiples".
