@@ -1,0 +1,244 @@
+﻿@page "/empresas"
+@using PdcEvaluacion.Core.Entities
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Gestión de Empresas</h3>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        @(modoEdicion ? "✏️ Editar Empresa" : "➕ Nueva Empresa")
+    </div>
+    <div class="card-body">
+        <EditForm Model="@empresaActual" OnValidSubmit="GuardarEmpresa">
+            <DataAnnotationsValidator />
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label>NIT <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="empresaActual.Nit" required />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label>Razón Social <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="empresaActual.RazonSocial" required />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label>Nombre Comercial <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="empresaActual.NombreComercial" required />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Teléfono <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="empresaActual.Telefono" required />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Email <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="empresaActual.Email" required type="email" />
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <label>País <span class="text-danger">*</span></label>
+                    <select class="form-control" value="@paisSeleccionadoId" @onchange="CambioPais" required>
+                        <option value="">Seleccione...</option>
+                        @foreach (var pais in listaPaises)
+                        {
+                            <option value="@pais.Id">@pais.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label>Departamento <span class="text-danger">*</span></label>
+                    <select class="form-control" value="@deptoSeleccionadoId" @onchange="CambioDepto" disabled="@(paisSeleccionadoId == 0)" required>
+                        <option value="">Seleccione...</option>
+                        @foreach (var depto in listaDeptos)
+                        {
+                            <option value="@depto.Id">@depto.Nombre</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label>Municipio <span class="text-danger">*</span></label>
+                    <InputSelect class="form-control" @bind-Value="empresaActual.MunicipioId" disabled="@(deptoSeleccionadoId == 0)" required>
+                        <option value="0">Seleccione...</option>
+                        @foreach (var mun in listaMunicipios)
+                        {
+                            <option value="@mun.Id">@mun.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success">
+                @(modoEdicion ? "Actualizar" : "Guardar")
+            </button>
+
+            @if (modoEdicion)
+            {
+                <button type="button" class="btn btn-secondary ms-2" @onclick="CancelarEdicion">Cancelar</button>
+            }
+        </EditForm>
+    </div>
+</div>
+
+@if (listaEmpresas == null)
+{
+    <div class="spinner-border text-primary" role="status"></div>
+}
+else
+{
+    <table class="table table-hover table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>NIT</th>
+                <th>Nombre Comercial</th>
+                <th>Ubicación</th>
+                <th style="width: 200px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var empresa in listaEmpresas)
+            {
+                <tr>
+                    <td>@empresa.Nit</td>
+                    <td>@empresa.NombreComercial</td>
+                    <td>@(empresa.Municipio?.Nombre ?? "N/A"), @(empresa.Municipio?.Departamento?.Nombre ?? "")</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm me-2" @onclick="() => CargarParaEditar(empresa)">
+                            ✏️
+                        </button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => BorrarEmpresa(empresa.Id)">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Empresa> listaEmpresas = new();
+    private Empresa empresaActual = new();
+    private bool modoEdicion = false;
+
+    private List<Pais> listaPaises = new();
+    private List<Departamento> listaDeptos = new();
+    private List<Municipio> listaMunicipios = new();
+
+    private int paisSeleccionadoId = 0;
+    private int deptoSeleccionadoId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarEmpresas();
+        listaPaises = await Http.GetFromJsonAsync<List<Pais>>("api/Geografia/Paises") ?? new();
+    }
+
+    async Task CargarEmpresas() => listaEmpresas = await Http.GetFromJsonAsync<List<Empresa>>("api/Empresas") ?? new();
+
+    async Task CambioPais(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            paisSeleccionadoId = id;
+            if (id > 0)
+            {
+                listaDeptos = await Http.GetFromJsonAsync<List<Departamento>>($"api/Geografia/Departamentos/{id}") ?? new();
+            }
+            else
+            {
+                listaDeptos.Clear();
+            }
+            listaMunicipios.Clear();
+            deptoSeleccionadoId = 0;
+            empresaActual.MunicipioId = 0;
+        }
+    }
+
+    async Task CambioDepto(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            deptoSeleccionadoId = id;
+            if (id > 0)
+            {
+                listaMunicipios = await Http.GetFromJsonAsync<List<Municipio>>($"api/Geografia/Municipios/{id}") ?? new();
+            }
+            else
+            {
+                listaMunicipios.Clear();
+            }
+            empresaActual.MunicipioId = 0;
+        }
+    }
+
+    async Task GuardarEmpresa()
+    {
+        if (empresaActual.MunicipioId == 0) return;
+
+        HttpResponseMessage respuesta;
+
+        if (modoEdicion)
+        {
+            respuesta = await Http.PutAsJsonAsync($"api/Empresas/{empresaActual.Id}", empresaActual);
+        }
+        else
+        {
+            respuesta = await Http.PostAsJsonAsync("api/Empresas", empresaActual);
+        }
+        
+        if (respuesta.IsSuccessStatusCode)
+        {
+            CancelarEdicion();
+            await CargarEmpresas();
+        }
+        else
+        {
+            var mensaje = await respuesta.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", mensaje);
+        }
+    }
+
+    async Task CargarParaEditar(Empresa empresa)
+    {
+        empresaActual = new Empresa
+        {
+            Id = empresa.Id,
+            Nit = empresa.Nit,
+            RazonSocial = empresa.RazonSocial,
+            NombreComercial = empresa.NombreComercial,
+            Telefono = empresa.Telefono,
+            Email = empresa.Email,
+            MunicipioId = empresa.MunicipioId
+        };
+
+        modoEdicion = true;
+
+        if (empresa.Municipio != null)
+        {
+            paisSeleccionadoId = empresa.Municipio.Departamento.PaisId;
+            listaDeptos = await Http.GetFromJsonAsync<List<Departamento>>($"api/Geografia/Departamentos/{paisSeleccionadoId}") ?? new();
+
+            deptoSeleccionadoId = empresa.Municipio.DepartamentoId;
+            listaMunicipios = await Http.GetFromJsonAsync<List<Municipio>>($"api/Geografia/Municipios/{deptoSeleccionadoId}") ?? new();
+        }
+    }
+
+    void CancelarEdicion()
+    {
+        empresaActual = new Empresa();
+        modoEdicion = false;
+        paisSeleccionadoId = 0;
+        deptoSeleccionadoId = 0;
+        listaDeptos.Clear();
+        listaMunicipios.Clear();
+    }
+
+    async Task BorrarEmpresa(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "¿Estás seguro de borrar esta empresa?"))
+        {
+            await Http.DeleteAsync($"api/Empresas/{id}");
+            await CargarEmpresas();
+        }
+    }
+}

@@ -1,0 +1,240 @@
+﻿@page "/colaboradores"
+@using PdcEvaluacion.Core.Entities
+@using System.ComponentModel.DataAnnotations
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Gestión de Colaboradores</h3>
+
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        @(modoEdicion ? "✏️ Editar Colaborador" : "➕ Nuevo Colaborador")
+    </div>
+    <div class="card-body">
+        <EditForm Model="@colabDTO" OnValidSubmit="GuardarColaborador">
+            <DataAnnotationsValidator />
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label>Nombre Completo <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="colabDTO.NombreCompleto" />
+                    <ValidationMessage For="@(() => colabDTO.NombreCompleto)" />
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label>Edad <span class="text-danger">*</span></label>
+                    <InputNumber class="form-control" @bind-Value="colabDTO.Edad" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label>Teléfono <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="colabDTO.Telefono" />
+                    <ValidationMessage For="@(() => colabDTO.Telefono)" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Email <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="colabDTO.Email" />
+                    <ValidationMessage For="@(() => colabDTO.Email)" />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label>Asignar Empresas (Ctrl + Clic para varias):</label>
+                    <select class="form-control" multiple @bind="empresaIdsSeleccionados" style="height: 120px;">
+                        @foreach (var emp in listaEmpresasDisponibles)
+                        {
+                            <option value="@emp.Id">@emp.NombreComercial</option>
+                        }
+                    </select>
+                    <small class="text-muted">Mantén presionada la tecla Ctrl para seleccionar múltiples.</small>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                @(modoEdicion ? "Actualizar" : "Guardar")
+            </button>
+            @if (modoEdicion)
+            {
+                <button type="button" class="btn btn-secondary ms-2" @onclick="CancelarEdicion">Cancelar</button>
+            }
+        </EditForm>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text">🔍</span>
+            <input type="text" class="form-control" placeholder="Buscar por nombre, email o empresa..."
+                   @bind="textoBusqueda" @bind:event="oninput" />
+        </div>
+    </div>
+</div>
+
+<table class="table table-bordered table-striped table-hover">
+    <thead class="table-light">
+        <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Empresas Asignadas</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var colab in ColaboradoresFiltrados)
+        {
+            <tr>
+                <td>@colab.NombreCompleto</td>
+                <td>@colab.Email</td>
+                <td>
+                    @if (colab.ColaboradoresEmpresas != null && colab.ColaboradoresEmpresas.Any())
+                    {
+                        var nombres = colab.ColaboradoresEmpresas.Select(ce => ce.Empresa?.NombreComercial).Where(n => n != null).ToList();
+
+                        @foreach (var nombre in nombres)
+                        {
+                            <span class="badge bg-info text-dark me-1">@nombre</span>
+                        }
+                    }
+                    else
+                    {
+                        <span class="text-muted small">Sin asignar</span>
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-warning btn-sm me-1" @onclick="() => CargarParaEditar(colab)">✏️</button>
+                    <button class="btn btn-danger btn-sm" @onclick="() => BorrarColaborador(colab.Id)">🗑️</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (!ColaboradoresFiltrados.Any())
+{
+    <div class="alert alert-warning text-center">No se encontraron colaboradores.</div>
+}
+
+@code {
+    public class ColaboradorDTO
+    {
+        public int Id { get; set; }
+
+        [Required(ErrorMessage = "El nombre es obligatorio")]
+        public string NombreCompleto { get; set; } = "";
+
+        [Range(18, 99, ErrorMessage = "Debe ser mayor de edad")]
+        public int Edad { get; set; }
+
+        [Required]
+        public string Telefono { get; set; } = "";
+
+        [Required, EmailAddress]
+        public string Email { get; set; } = "";
+
+        public int[] EmpresaIds { get; set; } = Array.Empty<int>();
+    }
+
+    private ColaboradorDTO colabDTO = new();
+    private int[] empresaIdsSeleccionados = Array.Empty<int>();
+    private bool modoEdicion = false;
+
+    private List<Colaborador> listaColaboradores = new();
+    private List<Empresa> listaEmpresasDisponibles = new();
+
+    private string textoBusqueda = "";
+
+    private List<Colaborador> ColaboradoresFiltrados
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(textoBusqueda))
+                return listaColaboradores;
+
+            return listaColaboradores
+                .Where(c =>
+                    c.NombreCompleto.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                    c.Email.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                    (c.ColaboradoresEmpresas != null &&
+                     c.ColaboradoresEmpresas.Any(ce => ce.Empresa != null && ce.Empresa.NombreComercial.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase)))
+                ).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    async Task CargarDatos()
+    {
+        listaColaboradores = await Http.GetFromJsonAsync<List<Colaborador>>("api/Colaboradores") ?? new();
+        listaEmpresasDisponibles = await Http.GetFromJsonAsync<List<Empresa>>("api/Empresas") ?? new();
+    }
+
+    async Task GuardarColaborador()
+    {
+        colabDTO.EmpresaIds = empresaIdsSeleccionados;
+
+        HttpResponseMessage respuesta;
+
+        if (modoEdicion)
+        {
+            respuesta = await Http.PutAsJsonAsync($"api/Colaboradores/{colabDTO.Id}", colabDTO);
+        }
+        else
+        {
+            respuesta = await Http.PostAsJsonAsync("api/Colaboradores", colabDTO);
+        }
+
+        if (respuesta.IsSuccessStatusCode)
+        {
+            CancelarEdicion();
+            await CargarDatos();
+        }
+        else
+        {
+            var mensaje = await respuesta.Content.ReadAsStringAsync();
+            await JS.InvokeVoidAsync("alert", mensaje);
+        }
+    }
+
+    void CargarParaEditar(Colaborador colab)
+    {
+        modoEdicion = true;
+        colabDTO = new ColaboradorDTO
+        {
+            Id = colab.Id,
+            NombreCompleto = colab.NombreCompleto,
+            Edad = colab.Edad,
+            Telefono = colab.Telefono,
+            Email = colab.Email
+        };
+
+        if (colab.ColaboradoresEmpresas != null)
+        {
+            empresaIdsSeleccionados = colab.ColaboradoresEmpresas.Select(ce => ce.EmpresaId).ToArray();
+        }
+    }
+
+    void CancelarEdicion()
+    {
+        modoEdicion = false;
+        colabDTO = new ColaboradorDTO();
+        empresaIdsSeleccionados = Array.Empty<int>();
+    }
+
+    async Task BorrarColaborador(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "¿Eliminar colaborador?"))
+        {
+            var respuesta = await Http.DeleteAsync($"api/Colaboradores/{id}");
+            if (respuesta.IsSuccessStatusCode)
+            {
+                await CargarDatos();
+            }
+            else
+            {
+                var mensaje = await respuesta.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", mensaje);
+            }
+        }
+    }
+}

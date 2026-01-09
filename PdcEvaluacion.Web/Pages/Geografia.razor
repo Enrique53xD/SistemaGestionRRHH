@@ -1,0 +1,235 @@
+﻿@page "/geografia"
+@using PdcEvaluacion.Core.Entities
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<h3>Mantenimiento Geográfico</h3>
+<p class="text-muted">Selecciona un elemento (clic en el nombre) para gestionar sus subdivisiones. Usa el ✏️ para renombrar.</p>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">1. Países</div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="Nuevo País..." @bind="nuevoPaisNombre" />
+                    <button class="btn btn-success" @onclick="CrearPais">＋</button>
+                </div>
+                <ul class="list-group">
+                    @foreach (var pais in listaPaises)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center @(paisSeleccionado?.Id == pais.Id ? "active" : "")"
+                            style="cursor:pointer;"
+                            @onclick="() => SeleccionarPais(pais)">
+
+                            <span>@pais.Nombre</span>
+
+                            <div>
+                                <button class="btn btn-sm btn-warning me-1" @onclick="() => EditarPais(pais)" @onclick:stopPropagation="true">✏️</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => BorrarPais(pais.Id)" @onclick:stopPropagation="true">🗑</button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        @if (paisSeleccionado != null)
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">2. Deptos. de @paisSeleccionado.Nombre</div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Nuevo Depto..." @bind="nuevoDeptoNombre" />
+                        <button class="btn btn-success" @onclick="CrearDepto">＋</button>
+                    </div>
+                    <ul class="list-group">
+                        @foreach (var depto in listaDeptos)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center @(deptoSeleccionado?.Id == depto.Id ? "active" : "")"
+                                style="cursor:pointer;"
+                                @onclick="() => SeleccionarDepto(depto)">
+
+                                <span>@depto.Nombre</span>
+
+                                <div>
+                                    <button class="btn btn-sm btn-warning me-1" @onclick="() => EditarDepto(depto)" @onclick:stopPropagation="true">✏️</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => BorrarDepto(depto.Id)" @onclick:stopPropagation="true">🗑</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                    @if (!listaDeptos.Any())
+                    {
+                        <span class="text-muted small">Sin registros</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-md-4">
+        @if (deptoSeleccionado != null)
+        {
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">3. Munis. de @deptoSeleccionado.Nombre</div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Nuevo Municipio..." @bind="nuevoMuniNombre" />
+                        <button class="btn btn-success" @onclick="CrearMuni">＋</button>
+                    </div>
+                    <ul class="list-group">
+                        @foreach (var muni in listaMunis)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@muni.Nombre</span>
+                                <div>
+                                    <button class="btn btn-sm btn-warning me-1" @onclick="() => EditarMuni(muni)" @onclick:stopPropagation="true">✏️</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => BorrarMuni(muni.Id)" @onclick:stopPropagation="true">🗑</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                    @if (!listaMunis.Any())
+                    {
+                        <span class="text-muted small">Sin registros</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    List<Pais> listaPaises = new();
+    List<Departamento> listaDeptos = new();
+    List<Municipio> listaMunis = new();
+
+    Pais? paisSeleccionado;
+    Departamento? deptoSeleccionado;
+
+    string nuevoPaisNombre = "";
+    string nuevoDeptoNombre = "";
+    string nuevoMuniNombre = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarPaises();
+    }
+
+    async Task CargarPaises() => listaPaises = await Http.GetFromJsonAsync<List<Pais>>("api/Geografia/Paises") ?? new();
+
+    async Task CrearPais()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoPaisNombre)) return;
+        var response = await Http.PostAsJsonAsync("api/Geografia/Paises", new Pais { Nombre = nuevoPaisNombre });
+        if (response.IsSuccessStatusCode) { nuevoPaisNombre = ""; await CargarPaises(); }
+        else await MostrarError(response);
+    }
+
+    async Task EditarPais(Pais pais)
+    {
+        string nuevoNombre = await JS.InvokeAsync<string>("prompt", "Editar nombre del país:", pais.Nombre);
+
+        if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != pais.Nombre)
+        {
+            var paisEditado = new Pais { Id = pais.Id, Nombre = nuevoNombre };
+            var response = await Http.PutAsJsonAsync($"api/Geografia/Paises/{pais.Id}", paisEditado);
+
+            if (response.IsSuccessStatusCode) await CargarPaises();
+            else await MostrarError(response);
+        }
+    }
+
+    async Task BorrarPais(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "¿Borrar este país?"))
+        {
+            var response = await Http.DeleteAsync($"api/Geografia/Paises/{id}");
+            if (response.IsSuccessStatusCode) { paisSeleccionado = null; deptoSeleccionado = null; await CargarPaises(); }
+            else await MostrarError(response);
+        }
+    }
+
+    async Task SeleccionarPais(Pais p)
+    {
+        paisSeleccionado = p;
+        deptoSeleccionado = null;
+        listaMunis.Clear();
+        listaDeptos = await Http.GetFromJsonAsync<List<Departamento>>($"api/Geografia/Departamentos/{p.Id}") ?? new();
+    }
+
+    async Task CrearDepto()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoDeptoNombre) || paisSeleccionado == null) return;
+        var response = await Http.PostAsJsonAsync("api/Geografia/Departamentos", new Departamento { Nombre = nuevoDeptoNombre, PaisId = paisSeleccionado.Id });
+        if (response.IsSuccessStatusCode) { nuevoDeptoNombre = ""; await SeleccionarPais(paisSeleccionado); }
+        else await MostrarError(response);
+    }
+
+    async Task EditarDepto(Departamento depto)
+    {
+        string nuevoNombre = await JS.InvokeAsync<string>("prompt", "Editar nombre del departamento:", depto.Nombre);
+        if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != depto.Nombre)
+        {
+            var deptoEditado = new Departamento { Id = depto.Id, Nombre = nuevoNombre, PaisId = depto.PaisId };
+            var response = await Http.PutAsJsonAsync($"api/Geografia/Departamentos/{depto.Id}", deptoEditado);
+            if (response.IsSuccessStatusCode) await SeleccionarPais(paisSeleccionado!);
+            else await MostrarError(response);
+        }
+    }
+
+    async Task BorrarDepto(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "¿Borrar departamento?"))
+        {
+            var response = await Http.DeleteAsync($"api/Geografia/Departamentos/{id}");
+            if (response.IsSuccessStatusCode) await SeleccionarPais(paisSeleccionado!);
+            else await MostrarError(response);
+        }
+    }
+
+    async Task SeleccionarDepto(Departamento d)
+    {
+        deptoSeleccionado = d;
+        listaMunis = await Http.GetFromJsonAsync<List<Municipio>>($"api/Geografia/Municipios/{d.Id}") ?? new();
+    }
+
+    async Task CrearMuni()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoMuniNombre) || deptoSeleccionado == null) return;
+        var response = await Http.PostAsJsonAsync("api/Geografia/Municipios", new Municipio { Nombre = nuevoMuniNombre, DepartamentoId = deptoSeleccionado.Id });
+        if (response.IsSuccessStatusCode) { nuevoMuniNombre = ""; await SeleccionarDepto(deptoSeleccionado); }
+        else await MostrarError(response);
+    }
+
+    async Task EditarMuni(Municipio muni)
+    {
+        string nuevoNombre = await JS.InvokeAsync<string>("prompt", "Editar nombre del municipio:", muni.Nombre);
+        if (!string.IsNullOrWhiteSpace(nuevoNombre) && nuevoNombre != muni.Nombre)
+        {
+            var muniEditado = new Municipio { Id = muni.Id, Nombre = nuevoNombre, DepartamentoId = muni.DepartamentoId };
+            var response = await Http.PutAsJsonAsync($"api/Geografia/Municipios/{muni.Id}", muniEditado);
+            if (response.IsSuccessStatusCode) await SeleccionarDepto(deptoSeleccionado!);
+            else await MostrarError(response);
+        }
+    }
+
+    async Task BorrarMuni(int id)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", "¿Borrar municipio?"))
+        {
+            var response = await Http.DeleteAsync($"api/Geografia/Municipios/{id}");
+            if (response.IsSuccessStatusCode) await SeleccionarDepto(deptoSeleccionado!);
+            else await MostrarError(response);
+        }
+    }
+
+    async Task MostrarError(HttpResponseMessage response)
+    {
+        var mensaje = await response.Content.ReadAsStringAsync();
+        await JS.InvokeVoidAsync("alert", mensaje);
+    }
+}

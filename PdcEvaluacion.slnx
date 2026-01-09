@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PdcEvaluacion.API/PdcEvaluacion.API.csproj" Id="a256e461-e06c-40c4-918b-da947619de91" />
+  <Project Path="PdcEvaluacion.Core/PdcEvaluacion.Core.csproj" Id="c5f298fe-c5c5-45ed-bb31-d7f48c04d440" />
+  <Project Path="PdcEvaluacion.Infrastructure/PdcEvaluacion.Infrastructure.csproj" Id="18c3c064-1a3e-48df-b8ec-44e7cf20eff3" />
+  <Project Path="PdcEvaluacion.Web/PdcEvaluacion.Web.csproj" Id="6aeee7ba-a016-4867-b7a2-a3e7b5c163e3" />
+</Solution>

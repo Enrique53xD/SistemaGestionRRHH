@@ -1,0 +1,86 @@
+﻿@page "/"
+@inject HttpClient Http
+@using PdcEvaluacion.Core.Entities
+
+<div class="text-center mt-5">
+    <h1>Sistema de RRHH</h1>
+    <p class="lead">Bienvenido al panel de control de administración.</p>
+</div>
+
+@if (cargando)
+{
+    <div class="d-flex justify-content-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="row mt-5">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3 shadow">
+                <div class="card-header">Empresas</div>
+                <div class="card-body">
+                    <h1 class="card-title display-4">@totalEmpresas</h1>
+                    <p class="card-text">Registradas en el sistema</p>
+                </div>
+                <div class="card-footer">
+                    <a href="empresas" class="text-white">Ir a gestionar →</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3 shadow">
+                <div class="card-header">Colaboradores</div>
+                <div class="card-body">
+                    <h1 class="card-title display-4">@totalColaboradores</h1>
+                    <p class="card-text">Activos actualmente</p>
+                </div>
+                <div class="card-footer">
+                    <a href="colaboradores" class="text-white">Ir a gestionar →</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card text-white bg-info mb-3 shadow">
+                <div class="card-header">Cobertura</div>
+                <div class="card-body">
+                    <h1 class="card-title display-4">@totalPaises</h1>
+                    <p class="card-text">Países con operaciones</p>
+                </div>
+                <div class="card-footer">
+                    <a href="geografia" class="text-white">Ir a gestionar →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    int totalEmpresas = 0;
+    int totalColaboradores = 0;
+    int totalPaises = 0;
+    bool cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var empresas = await Http.GetFromJsonAsync<List<Empresa>>("api/Empresas");
+            var colaboradores = await Http.GetFromJsonAsync<List<Colaborador>>("api/Colaboradores");
+            var paises = await Http.GetFromJsonAsync<List<Pais>>("api/Geografia/Paises");
+
+            totalEmpresas = empresas?.Count ?? 0;
+            totalColaboradores = colaboradores?.Count ?? 0;
+            totalPaises = paises?.Count ?? 0;
+        }
+        catch (Exception)
+        {
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}
